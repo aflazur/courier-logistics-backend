@@ -4,6 +4,7 @@ import SSLCommerzPayment from 'sslcommerz-lts';
 import prisma from '../../config/prisma';
 import config from '../../config';
 import ApiError from '../../utils/ApiError';
+import { isTransitionAllowed } from '../shipment/shipment.stateMachine';
 
 const sslcz = new SSLCommerzPayment(
   config.sslcz.store_id,
@@ -49,25 +50,38 @@ const initiatePayment = async (
     cancel_url: config.sslcz.cancel_url,
     ipn_url: config.sslcz.ipn_url,
     shipping_method: 'Courier',
+    num_of_item: 1,
     product_name: `Delivery fee for shipment ${shipment.trackingCode}`,
     product_category: 'Logistics',
     product_profile: 'general',
+    // Customer info - SSLCommerz's API rejects the session (without a clear error) if any of
+    // these are missing, even though they seem like "shipping" details rather than payment ones.
     cus_name: customerEmail,
     cus_email: customerEmail,
     cus_add1: shipment.pickupAddress,
+    cus_city: 'Dhaka',
+    cus_state: 'Dhaka',
+    cus_postcode: '1000',
+    cus_country: 'Bangladesh',
     cus_phone: customerPhone,
+    // Shipping info - same requirement as above.
     ship_name: shipment.recipientName,
     ship_add1: shipment.deliveryAddress,
     ship_city: 'Dhaka',
+    ship_state: 'Dhaka',
+    ship_postcode: '1000',
     ship_country: 'Bangladesh',
   };
 
   const apiResponse = await sslcz.init(sessionData);
 
   if (!apiResponse?.GatewayPageURL) {
+    // Log SSLCommerz's actual rejection reason - without this, every failure looks identical
+    // and impossible to debug.
+    console.error('SSLCommerz session init failed:', JSON.stringify(apiResponse));
     throw new ApiError(
       httpStatus.BAD_GATEWAY,
-      'Failed to initiate payment session with SSLCommerz',
+      `Failed to initiate payment session with SSLCommerz: ${apiResponse?.failedreason || 'unknown reason - check server logs'}`,
     );
   }
 
@@ -101,20 +115,28 @@ const verifyAndUpdatePayment = async (val_id: string, tran_id: string) => {
       },
     });
 
-    // Move the shipment forward now that payment is confirmed
-    await tx.shipment.update({
-      where: { id: payment.shipmentId },
-      data: { status: 'PICKUP_SCHEDULED' },
-    });
+    // Only advance the shipment if it's still exactly where we'd expect a just-paid shipment
+    // to be (PENDING, about to be scheduled for pickup). Without this check, confirming
+    // payment on a shipment that has since moved on its own timeline (already picked up,
+    // delivered, cancelled...) would force it backward - which is exactly the kind of
+    // state-machine violation shipment.stateMachine.ts exists to prevent everywhere else.
+    const shipment = await tx.shipment.findUnique({ where: { id: payment.shipmentId } });
+    if (shipment && isTransitionAllowed(shipment.status, 'PICKUP_SCHEDULED')) {
+      await tx.shipment.update({
+        where: { id: payment.shipmentId },
+        data: { status: 'PICKUP_SCHEDULED' },
+      });
 
-    await tx.shipmentStatusHistory.create({
-      data: {
-        shipmentId: payment.shipmentId,
-        toStatus: 'PICKUP_SCHEDULED',
-        changedBy: 'SYSTEM_PAYMENT_GATEWAY',
-        note: `Payment confirmed via SSLCommerz (tran_id=${tran_id})`,
-      },
-    });
+      await tx.shipmentStatusHistory.create({
+        data: {
+          shipmentId: payment.shipmentId,
+          fromStatus: shipment.status,
+          toStatus: 'PICKUP_SCHEDULED',
+          changedBy: 'SYSTEM_PAYMENT_GATEWAY',
+          note: `Payment confirmed via SSLCommerz (tran_id=${tran_id})`,
+        },
+      });
+    }
 
     return payment;
   });
