@@ -1,0 +1,4 @@
+node_modules
+dist
+prisma/schema/*.prisma
+*.json
