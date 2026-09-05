@@ -1,0 +1,50 @@
+// ---------------------------------------------------------------------------
+// USER & COURIER PROFILE
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String       @id @default(uuid())
+  name         String
+  email        String       @unique
+  password     String? // null for social-login-only accounts
+  phone        String?
+  role         Role         @default(CUSTOMER)
+  authProvider AuthProvider @default(CREDENTIALS)
+  googleId     String?      @unique
+  isActive     Boolean      @default(true)
+  isVerified   Boolean      @default(false)
+  refreshToken String? // last issued refresh token (rotation check)
+
+  // relations
+  courierProfile    CourierProfile?
+  shipmentsAsSender Shipment[]      @relation("SenderShipments")
+  auditLogs         AuditLog[]      @relation("ActorAuditLogs")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // soft delete
+
+  @@index([role])
+  @@index([email])
+}
+
+model CourierProfile {
+  id            String  @id @default(uuid())
+  userId        String  @unique
+  user          User    @relation(fields: [userId], references: [id])
+  vehicleType   String? // bike, van, truck
+  licenseNumber String?
+  isAvailable   Boolean @default(true)
+  currentHubId  String?
+  currentHub    Hub?    @relation(fields: [currentHubId], references: [id])
+  rating        Float   @default(0)
+  totalEarnings Decimal @default(0) @db.Decimal(12, 2)
+
+  assignedShipments Shipment[] @relation("CourierShipments")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([isAvailable])
+}

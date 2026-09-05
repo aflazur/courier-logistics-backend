@@ -1,0 +1,21 @@
+// ---------------------------------------------------------------------------
+// HUB
+// ---------------------------------------------------------------------------
+
+model Hub {
+  id      String @id @default(uuid())
+  name    String
+  city    String
+  zone    String
+  address String
+
+  couriers        CourierProfile[]
+  originShipments Shipment[]       @relation("OriginHub")
+  destShipments   Shipment[]       @relation("DestinationHub")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([city, zone])
+}

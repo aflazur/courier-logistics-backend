@@ -1,0 +1,21 @@
+// ---------------------------------------------------------------------------
+// PAYMENT
+// ---------------------------------------------------------------------------
+
+model Payment {
+  id            String        @id @default(uuid())
+  shipmentId    String        @unique
+  shipment      Shipment      @relation(fields: [shipmentId], references: [id])
+  amount        Decimal       @db.Decimal(12, 2)
+  method        PaymentMethod @default(SSLCOMMERZ)
+  status        PaymentStatus @default(PENDING)
+  transactionId String?       @unique // gateway tran_id
+  gatewayValId  String? // val_id returned after validation
+  paidAt        DateTime?
+  rawResponse   Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}

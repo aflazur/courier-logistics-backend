@@ -1,0 +1,19 @@
+// ---------------------------------------------------------------------------
+// AUDIT LOG
+// ---------------------------------------------------------------------------
+
+// Tracks who changed what, for admin oversight (role/status changes, shipment
+// status overrides, etc.) — queried by GET /admin/audit-logs.
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String
+  actor      User     @relation("ActorAuditLogs", fields: [actorId], references: [id])
+  action     String // e.g. "SHIPMENT_STATUS_UPDATED", "USER_ROLE_CHANGED"
+  entityType String // e.g. "Shipment", "User"
+  entityId   String
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+}
