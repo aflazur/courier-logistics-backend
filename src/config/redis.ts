@@ -3,10 +3,18 @@ import config from './index';
 
 // If REDIS_URL isn't configured (e.g. local dev without Redis installed), we fall back to a
 // no-op cache so the rest of the app works exactly the same, just without caching.
-const redisClient = config.redis_url ? new Redis(config.redis_url) : null;
+const redisClient = config.redis_url
+  ? new Redis(config.redis_url, {
+      maxRetriesPerRequest: 1,
+      retryStrategy: (times) => {
+        if (times > 3) return null; // stop retrying - ioredis marks the connection as failed
+        return Math.min(times * 200, 2000);
+      },
+    })
+  : null;
 
 if (redisClient) {
-  redisClient.on('error', (err) => console.error('Redis connection error:', err));
+  redisClient.on('error', (err) => console.error('Redis connection error:', err.message));
   redisClient.on('connect', () => console.log('✅ Redis connected'));
 }
 
@@ -18,7 +26,7 @@ const cacheGet = async <T>(key: string): Promise<T | null> => {
     const value = await redisClient.get(key);
     return value ? (JSON.parse(value) as T) : null;
   } catch {
-    return null; // cache errors should never break a request
+    return null;
   }
 };
 
@@ -31,12 +39,10 @@ const cacheSet = async (
   try {
     await redisClient.set(key, JSON.stringify(value), 'EX', ttlSeconds);
   } catch {
-    // ignore - caching is a performance optimization, not a correctness requirement
+    // ignore
   }
 };
 
-// Deletes every key matching a prefix (e.g. "hubs:*") - used to invalidate stale cache
-// entries whenever the underlying data changes (a hub is created/updated/deleted, etc).
 const cacheInvalidate = async (pattern: string): Promise<void> => {
   if (!redisClient) return;
   try {

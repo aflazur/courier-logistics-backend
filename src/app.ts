@@ -6,9 +6,7 @@ import cookieParser from 'cookie-parser';
 import session from 'express-session';
 import passport from 'passport';
 import rateLimit from 'express-rate-limit';
-import { RedisStore, RedisReply } from 'rate-limit-redis';
 import config from './config';
-import { redisClient } from './config/redis';
 import router from './routes';
 import globalErrorHandler from './middlewares/globalErrorHandler';
 import notFound from './middlewares/notFound';
@@ -42,39 +40,20 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Shared by both limiters below - only defined when Redis is actually configured, so rate
-// limits are shared correctly across multiple server instances; falls back to in-memory
-// per-instance limiting otherwise (fine for a single-instance deployment).
-const redisStore = redisClient
-  ? new RedisStore({
-      sendCommand: (...args: string[]): Promise<RedisReply> =>
-        // Safe: this closure only runs when redisStore is used below, which only happens
-        // when we're inside this same truthy branch (redisClient is a module-level import
-        // binding that TS can't narrow across the closure boundary, but it can't become null
-        // between this check and the store being used).
-        redisClient!.call(args[0], ...args.slice(1)) as Promise<RedisReply>,
-    })
-  : undefined;
-
-// Global rate limiter - prevents API abuse.
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
-  store: redisStore,
   message: { success: false, message: 'Too many requests, please try again later', errors: [] },
 });
 app.use(globalLimiter);
 
-// Auth endpoints get a tighter limit - these are the ones brute-force/credential-stuffing
-// attacks actually target.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  store: redisStore,
   message: {
     success: false,
     message: 'Too many auth attempts, please try again later',
