@@ -44,7 +44,12 @@ if (config.google.clientId && config.google.clientSecret) {
             });
           }
 
-          return done(null, user);
+          // Cast through unknown: passport's types expect Express.User (our JWT-flow shape,
+          // { userId, email, role }) here, but this callback deals in real Prisma User rows.
+          // The two never actually meet at runtime - the callback route reads this Prisma user
+          // directly (not via req.user) to issue our own JWT tokens, and req.user/session is
+          // never relied on anywhere else in the app.
+          return done(null, user as unknown as Express.User);
         } catch (err) {
           return done(err as Error);
         }
@@ -53,11 +58,13 @@ if (config.google.clientId && config.google.clientSecret) {
   );
 }
 
-passport.serializeUser((user: User, done) => done(null, user.id));
+passport.serializeUser((user: Express.User, done) => {
+  done(null, (user as unknown as User).id);
+});
 passport.deserializeUser(async (id: string, done) => {
   try {
     const user = await prisma.user.findFirst({ where: { id, deletedAt: null } });
-    done(null, user);
+    done(null, user as unknown as Express.User);
   } catch (err) {
     done(err as Error);
   }
