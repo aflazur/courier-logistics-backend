@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
-import { RedisStore as ConnectRedisStore } from 'connect-redis';
+import ConnectRedisStore from 'connect-redis';
 import passport from 'passport';
 import rateLimit from 'express-rate-limit';
 import config from './config';
