@@ -200,7 +200,7 @@ const assignCourier = async (shipmentId: string, courierProfileId: string) => {
   await cacheInvalidate(shipmentCacheKey(shipmentId));
 
   // Best-effort notification - never blocks or fails the assignment itself
-  await NotificationService.notifyCourierAssigned(
+  NotificationService.notifyCourierAssigned(
     updated.courierEmail,
     updated.courierName,
     updated.result.trackingCode,
@@ -268,7 +268,7 @@ const updateStatus = async (
 
   await cacheInvalidate(shipmentCacheKey(shipmentId));
 
-  await NotificationService.notifyShipmentStatusChange(
+  NotificationService.notifyShipmentStatusChange(
     sender.email,
     sender.name,
     updated.trackingCode,
