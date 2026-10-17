@@ -78,6 +78,8 @@ type ListFilters = {
   search?: string; // matches tracking code or recipient name
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  dateFrom?: string; // created on/after this date (YYYY-MM-DD)
+  dateTo?: string; // created on/before this date, inclusive
   senderId?: string; // restrict to a customer's own shipments
   courierProfileId?: string; // restrict to a courier's assigned shipments
 };
@@ -98,6 +100,17 @@ const listShipments = async (filters: ListFilters) => {
       { recipientName: { contains: filters.search, mode: 'insensitive' } },
     ];
   }
+
+  const createdAt: Prisma.DateTimeFilter = {};
+  if (filters.dateFrom) {
+    const from = new Date(`${filters.dateFrom}T00:00:00.000Z`);
+    if (!Number.isNaN(from.getTime())) createdAt.gte = from;
+  }
+  if (filters.dateTo) {
+    const to = new Date(`${filters.dateTo}T23:59:59.999Z`);
+    if (!Number.isNaN(to.getTime())) createdAt.lte = to;
+  }
+  if (createdAt.gte || createdAt.lte) where.createdAt = createdAt;
 
   const orderBy = { [filters.sortBy || 'createdAt']: filters.sortOrder || 'desc' };
 

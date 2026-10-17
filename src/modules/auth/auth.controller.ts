@@ -4,6 +4,7 @@ import { Request, Response, NextFunction } from 'express';
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 import { AuthService } from './auth.service';
+import config from '../../config';
 
 const register = catchAsync(async (req, res) => {
   const result = await AuthService.register(req.body);
@@ -58,6 +59,7 @@ const googleCallback = (req: Request, res: Response, next: NextFunction) => {
     async (_err: unknown, user: { id: string; email: string; role: string } | false) => {
       try {
         if (!user) {
+          if (config.frontendUrl) return res.redirect(`${config.frontendUrl}/login?error=google`);
           return res.status(httpStatus.UNAUTHORIZED).json({
             success: false,
             message: 'Google authentication failed',
@@ -67,8 +69,13 @@ const googleCallback = (req: Request, res: Response, next: NextFunction) => {
 
         const tokens = await AuthService.issueTokensForUser(user);
 
-        // A real frontend would redirect here instead, e.g.
-        // res.redirect(`${FRONTEND_URL}/oauth/callback?accessToken=...&refreshToken=...`)
+        // With a frontend configured, hand the tokens to its server-side route, which stores
+        // them in httpOnly cookies and immediately redirects away (they never stay in the URL
+        // bar). Without FRONTEND_URL (e.g. API-only testing) we fall back to plain JSON.
+        if (config.frontendUrl) {
+          const qs = new URLSearchParams(tokens).toString();
+          return res.redirect(`${config.frontendUrl}/api/auth/google/complete?${qs}`);
+        }
         sendResponse(res, {
           statusCode: httpStatus.OK,
           success: true,
@@ -76,6 +83,7 @@ const googleCallback = (req: Request, res: Response, next: NextFunction) => {
           data: tokens,
         });
       } catch (err) {
+        if (config.frontendUrl) return res.redirect(`${config.frontendUrl}/login?error=google`);
         next(err);
       }
     },

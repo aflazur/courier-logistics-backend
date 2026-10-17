@@ -19,6 +19,9 @@ export default {
 
   bcrypt_salt_rounds: Number(process.env.BCRYPT_SALT_ROUNDS) || 12,
 
+  // Where the browser is sent after Google login (the Next.js frontend). Unset = JSON response.
+  frontendUrl: process.env.FRONTEND_URL?.replace(/\/$/, ''),
+
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,

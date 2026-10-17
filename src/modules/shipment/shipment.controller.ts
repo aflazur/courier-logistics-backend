@@ -21,7 +21,7 @@ const createShipment = catchAsync(async (req, res) => {
 // GET /shipments/my-shipments -> customer's own
 // GET /shipments/my-assigned -> courier's assigned shipments
 const listShipments = catchAsync(async (req, res) => {
-  const { page, limit, status, search, sortBy, sortOrder } = req.query;
+  const { page, limit, status, search, sortBy, sortOrder, dateFrom, dateTo } = req.query;
 
   const result = await ShipmentService.listShipments({
     page: page ? Number(page) : undefined,
@@ -30,6 +30,8 @@ const listShipments = catchAsync(async (req, res) => {
     search: search as string | undefined,
     sortBy: sortBy as string | undefined,
     sortOrder: sortOrder as 'asc' | 'desc' | undefined,
+    dateFrom: dateFrom as string | undefined,
+    dateTo: dateTo as string | undefined,
   });
 
   sendResponse(res, {
@@ -42,7 +44,7 @@ const listShipments = catchAsync(async (req, res) => {
 });
 
 const myShipments = catchAsync(async (req, res) => {
-  const { page, limit, status, search, sortBy, sortOrder } = req.query;
+  const { page, limit, status, search, sortBy, sortOrder, dateFrom, dateTo } = req.query;
   const result = await ShipmentService.listShipments({
     page: page ? Number(page) : undefined,
     limit: limit ? Number(limit) : undefined,
@@ -50,6 +52,8 @@ const myShipments = catchAsync(async (req, res) => {
     search: search as string | undefined,
     sortBy: sortBy as string | undefined,
     sortOrder: sortOrder as 'asc' | 'desc' | undefined,
+    dateFrom: dateFrom as string | undefined,
+    dateTo: dateTo as string | undefined,
     senderId: req.user!.userId,
   });
   sendResponse(res, {
@@ -64,7 +68,7 @@ const myShipments = catchAsync(async (req, res) => {
 // Distinct from myShipments: a courier's User id is not their CourierProfile id, so this
 // resolves userId -> courierProfile.id first, then filters shipments by that.
 const myAssignedShipments = catchAsync(async (req, res) => {
-  const { page, limit, status, search, sortBy, sortOrder } = req.query;
+  const { page, limit, status, search, sortBy, sortOrder, dateFrom, dateTo } = req.query;
   const result = await ShipmentService.listMyAssignedShipments(req.user!.userId, {
     page: page ? Number(page) : undefined,
     limit: limit ? Number(limit) : undefined,
@@ -72,6 +76,8 @@ const myAssignedShipments = catchAsync(async (req, res) => {
     search: search as string | undefined,
     sortBy: sortBy as string | undefined,
     sortOrder: sortOrder as 'asc' | 'desc' | undefined,
+    dateFrom: dateFrom as string | undefined,
+    dateTo: dateTo as string | undefined,
   });
   sendResponse(res, {
     statusCode: httpStatus.OK,
